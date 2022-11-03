@@ -1,0 +1,141 @@
+---
+title: "01-Species-Detected-Wilcoxon-Tests"
+author: "Pooja Choksi"
+date: '2022-11-03'
+output: html_document
+
+---
+This chunk of code is used to calculate the cumulative number of species detected from manual annotation of randomly selected acoustic data between 5:30 to 9:30 AM over data from 2020 and 2021. 
+
+#INSTALL ALL LIBRARIES
+
+```{r setup, include=DALSE, message = FALSE, warning= FALSE}
+
+#Install all necessary libraries 
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(reshape)
+library(stringr)
+library(interp)
+```
+
+#READ IN DATA
+
+```{r include= FALSE, message = FALSE, warning=FALSE}
+
+#CSV of manual annotations of 10-second segments of randomly selected data for each sampling location (recorder location)
+Data_annotation <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-data-annotation-merged.csv")
+
+Data_annotation = select(Data_annotation, -X)
+
+#CSV of species habitat preference
+species_habitat <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Bird_Mammal_Species_List_Mandla_20211211.csv")
+
+
+```
+
+#CALCULATE CUMULATIVE NUMBER OF SPECIES DETECTED (ALSO PER YEAR)
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#Sum up all the instances of a species vocalizing by th recorder location
+species_per_site <- Data_annotation%>%group_by(Site_Code, Site_Name, Season, Treatment)%>% summarise(across(where(is.numeric), sum))
+
+#Remove all other non-avian species columns to calculate only the cumulative number of bird species per site  
+drop.cols <- c("Uniqueid",
+               "X ",
+               "Insect_sp_1", 
+               "Insect_sp_2",
+               "Insect_sp_3",
+               "Insect_sp_4",
+               "Insect_sp_5", 
+               "Insect_sp_6",
+               "Insect_sp_7",
+               "Insect_sp_8","SD_card",
+               "Amphibian_Presence",
+               "Amphibian_sp_1",
+               "Amphibian_sp_2",
+               "Amphibian_sp_3", 
+               "Human_1_grazing",
+               "Human_2_walking_conversing",
+               "Human_2._walking_conversing",
+               "Human_3_feral_dogs",
+               "Human_4_wood_cutting",
+               "Human_5_rooster",
+               "Human_6_chainsaw",
+               "Human_7_vehicular_noise",
+               "Human_8_gunshot","Human_9_music_playing",
+               "Human_10_alarm","Quality",
+               #also remove all the mammals from the data
+               "NPLA","RHMA","TSPS","SPDE","BADE", "GOJA", "BLBU", "GAUR", "Rain_Wind","WIBO", "SADE")
+
+species_per_site <-species_per_site%>%dplyr::select(-one_of(drop.cols))
+
+#Remove NAs in columns from manual annotation
+species_per_site<-  species_per_site%>%group_by(Site_Code, Site_Name, Treatment, Season)%>%
+  dplyr::mutate_all(funs(replace_na(.,0)))
+
+#Using the totals from species_per_Site, we calculate cumulative species detected per year
+#first note species presence/ absence in the totals
+total_species_detected <- species_per_site %>% mutate_if(is.numeric, ~1 * (. > 0))
+
+#sum all species presences at sampling location for total species detected per year
+total_species_detected <- total_species_detected%>%mutate(Site_Species_Detected= rowSums(across(where(is.numeric))))
+
+#add total species richness from the species richness file to species_per_site file 
+total_species_detected <- merge(species_per_site, total_species_detected[,c("Site_Species_Detected", "Site_Code", "Season")],by.x= c("Site_Code", "Season"), by.y= c("Site_Code", "Season"))
+
+```
+
+#FIGURE 3(A) CUMULATIVE NUMBER OF SPECIES DETECTED 
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+#FIG 3A: Cumulative number of species detected
+
+#colour blind friendly palette
+cbp <- c("#999999", "#E69F00", "#56B4E9")
+
+#Plot Fig 3A 
+#Actual Wilcoxon test results presented in Tables S6 and S7
+ggplot(total_species_detected, aes(x = Treatment, y = Site_Species_Detected, fill = Treatment)) +
+  geom_violin(width = 0.8)+
+  geom_boxplot(width=0.1, color="black", alpha=0.2) + 
+  scale_fill_manual(values = cbp)+
+  theme_classic()+
+  scale_y_continuous(name = "Cumulative number of species detected in acoustic data", breaks=seq(0, 80, 10)) +
+  scale_x_discrete(labels = c("LLD", "Restored", "Unrestored"))+
+  theme(text = element_text(size=12),
+        axis.text.x = element_text(angle=0, hjust=0.5))+
+  geom_signif(comparisons = list(c("Restored", 
+                                   "Unrestored", "No_Lantana")), map_signif_level=TRUE)
+
+```
+
+#CALCULATE CUMULATIVE SPECIES DETECTED AS PER HABITAT PREFERENCES 
+Habitat preference was taken from State of India's Birds 
+
+```{r include = TRUE, message=FALSE, warning=FALSE}
+
+#Remove the mammals in this list 
+species_habitat <- head(species_habitat,-10)
+
+species_richness <- subset(species_richness, select = -X)
+
+#pivot longer
+total_species_detected_long <- total_species_detected%>%
+  pivot_longer(!c(Site_Code,Site_Name, Site_Species_Detected, Treatment, Season), names_to = "Species_Code", values_to = "Species_Presence")
+
+#stitch the tables
+species_detected_habitat <- merge(total_species_detected_long, species_habitat[,c("Name_Code", "Habitat_specialization",
+"Migratory_Status", "Foraging_pref_1", "Foraging_pref_2","Diet_type_1", "Diet_type_2")], by.x = "Species_Code", by.y = "Name_Code")
+
+#determine if species is generalist of forest-woodland affiliated 
+trial <- species_detected_habitat%>%dplyr::mutate(generalist_or_forest = case_when(generalist == "1" & Species_Presence=="1" ~"Generalist", woodland == "1" & Species_Presence=="1" ~"Forest-affiliated",
+tropical_forest == "1" & Species_Presence=="1"~ "Forest-affiliated",
+TRUE~ "none"))
+
+
+
+
+```
