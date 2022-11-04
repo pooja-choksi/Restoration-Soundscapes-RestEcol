@@ -233,13 +233,6 @@ ggarrange(cum_num_detected, cum_generalist_detected, cum_forest_detected,
 
 ```
 
-#SAVE CSV OF CUMULATIVE NUMBER OF GENERALIST AND FOREST AND WOODLAND AFFILIATED SPECIES AND TOTAL NUMBER OF SPECIES DETECTED
-
-```{r message=FALSE, warning=FALSE, include=FALSE}
-
-write.csv(generalist_forest_sum, "Winter2020-2021-generalist-forest-sum.csv")
-```
-
 #WILCOXON TEST RESULTS 
 This chunk of code creates the piared datasets used for the Wilcoxon tests which are presented in Tables S6 and Table S7
 
@@ -664,7 +657,13 @@ unres_bench_generalist_median_2021
 
 ```
 
+#WRITE THE FILE USED FOR GLMMS IN 03-GLMM-ASU-SPECIES-DETECTED
+This file of total species detected and the number of generalists and specialists will be used for the generalized linear mixed models run in R script 03. 
 
+```{r message=FALSE, include= FALSE, warning=FALSE}
 
+write.csv(generalist_forest_sum, "Winter2020-2021-cum-species-gen-for-detect.csv")
 
+```
 
+#END
