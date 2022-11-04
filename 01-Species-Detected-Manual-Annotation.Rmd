@@ -5,9 +5,9 @@ date: '2022-11-03'
 output: html_document
 
 ---
-This chunk of code is used to calculate the cumulative number of species detected from manual annotation of randomly selected acoustic data between 5:30 to 9:30 AM over data from 2020 and 2021. 
+This chunk of code is used to calculate the cumulative number of species detected from manual annotation of randomly selected acoustic data between 5:30 to 9:30 AM over data from 2020 and 2021. Each figure and table in the main manuscript and supplementary information has been referenced in the description of the separate chunks of code.  
 
-#INSTALL ALL LIBRARIES
+#INSTALL ALL LIBRARIES NEEDED FOR ANALAYSIS:
 
 ```{r setup, include=DALSE, message = FALSE, warning= FALSE}
 
@@ -18,24 +18,27 @@ library(ggplot2)
 library(reshape)
 library(stringr)
 library(interp)
+library(ggsignif)
+library(ggpubr)
 ```
 
-#READ IN DATA
+#READ IN ALL DATA FOR THE ANALYSIS PRESENTED IN FIGURE 2, TABLES S6 AND TABLE S7.
 
 ```{r include= FALSE, message = FALSE, warning=FALSE}
 
-#CSV of manual annotations of 10-second segments of randomly selected data for each sampling location (recorder location)
+#CSV of manual annotations of 10-second segments (raw data) of randomly selected data for each sampling location (recorder location)
 Data_annotation <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-data-annotation-merged.csv")
 
 Data_annotation = select(Data_annotation, -X)
 
-#CSV of species habitat preference
+#CSV of species habitat preference 
 species_habitat <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Bird_Mammal_Species_List_Mandla_20211211.csv")
 
 
 ```
 
 #CALCULATE CUMULATIVE NUMBER OF SPECIES DETECTED (ALSO PER YEAR)
+This chunk of code is used to calculate the cumulative number of species detected in each year (winter season) across all sites. 
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
 
@@ -88,7 +91,8 @@ total_species_detected <- merge(species_per_site, total_species_detected[,c("Sit
 
 ```
 
-#FIGURE 3(A) CUMULATIVE NUMBER OF SPECIES DETECTED 
+#FIGURE 2(A) CUMULATIVE NUMBER OF SPECIES DETECTED 
+This chunk of code is to make the violin plot in Fig 2A of the cumulative number of species deteced in the sites. Wilcoxon test results presented in Tables S6 and S7
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
 #FIG 3A: Cumulative number of species detected
@@ -96,31 +100,28 @@ total_species_detected <- merge(species_per_site, total_species_detected[,c("Sit
 #colour blind friendly palette
 cbp <- c("#999999", "#E69F00", "#56B4E9")
 
-#Plot Fig 3A 
-#Actual Wilcoxon test results presented in Tables S6 and S7
-ggplot(total_species_detected, aes(x = Treatment, y = Site_Species_Detected, fill = Treatment)) +
+#Plot Fig 2A 
+cum_num_detected = ggplot(total_species_detected, aes(x = Treatment, y = Site_Species_Detected, fill = Treatment)) +
   geom_violin(width = 0.8)+
   geom_boxplot(width=0.1, color="black", alpha=0.2) + 
   scale_fill_manual(values = cbp)+
   theme_classic()+
-  scale_y_continuous(name = "Cumulative number of species detected in acoustic data", breaks=seq(0, 80, 10)) +
+  scale_y_continuous(name = "Cumulative number of species detected", breaks=seq(0, 80, 10)) + xlab("")+
   scale_x_discrete(labels = c("LLD", "Restored", "Unrestored"))+
-  theme(text = element_text(size=12),
-        axis.text.x = element_text(angle=0, hjust=0.5))+
-  geom_signif(comparisons = list(c("Restored", 
-                                   "Unrestored", "No_Lantana")), map_signif_level=TRUE)
+  theme(legend.position = "", text = element_text(size=12),
+        axis.text.x = element_text(angle=0, hjust=0.5))
 
 ```
 
 #CALCULATE CUMULATIVE SPECIES DETECTED AS PER HABITAT PREFERENCES 
-Habitat preference was taken from State of India's Birds 
+This chunk of code is to assign habitat preferences to all the bird species detected in the manually annotated acoustic data. Habitat preference was taken from State of India's Birds 2020. 
 
 ```{r include = TRUE, message=FALSE, warning=FALSE}
 
 #Remove the mammals in this list 
 species_habitat <- head(species_habitat,-10)
 
-species_richness <- subset(species_richness, select = -X)
+total_species_detected <- subset(total_species_detected, select = -X)
 
 #pivot longer
 total_species_detected_long <- total_species_detected%>%
@@ -130,12 +131,540 @@ total_species_detected_long <- total_species_detected%>%
 species_detected_habitat <- merge(total_species_detected_long, species_habitat[,c("Name_Code", "Habitat_specialization",
 "Migratory_Status", "Foraging_pref_1", "Foraging_pref_2","Diet_type_1", "Diet_type_2")], by.x = "Species_Code", by.y = "Name_Code")
 
+#Make separate columns for each habitat type 
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(woodland = case_when(Habitat_specialization == "Woodland" &Species_Presence>0 ~1,TRUE~ 0))
+
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(generalist = case_when(Habitat_specialization == "Generalist" &Species_Presence>0 ~1,TRUE~ 0))
+
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(grassland = case_when(Habitat_specialization == "Grassland" & Species_Presence>0 ~1,TRUE~ 0))
+
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(wetland = case_when(Habitat_specialization == "Wetland" &
+ Species_Presence>0 ~1,TRUE~ 0))
+
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(scrub = case_when(Habitat_specialization == "Scrub" & Species_Presence>0 ~1,TRUE~ 0))
+
+species_detected_habitat <- species_detected_habitat%>%
+  dplyr::mutate(tropical_forest = case_when(Habitat_specialization == "Tropical Forest" & Species_Presence>0 ~1,TRUE~ 0))
+
 #determine if species is generalist of forest-woodland affiliated 
-trial <- species_detected_habitat%>%dplyr::mutate(generalist_or_forest = case_when(generalist == "1" & Species_Presence=="1" ~"Generalist", woodland == "1" & Species_Presence=="1" ~"Forest-affiliated",
-tropical_forest == "1" & Species_Presence=="1"~ "Forest-affiliated",
+species_detected_habitat_sum <- species_detected_habitat%>%dplyr::mutate(generalist_or_forest = case_when(generalist == "1" & Species_Presence>0 ~"Generalist", woodland == "1" & Species_Presence>0 ~"Forest-affiliated",
+tropical_forest == "1" & Species_Presence>0~ "Forest-affiliated",
 TRUE~ "none"))
 
+write.csv(species_detected_habitat, "Winter2020-2021-species-detected-habitat-long.csv")
 
+```
+
+#CALCULATE CUMULATIVE NUMBER OF FOREST AND WOODLAND AFFILIATED SPECIES DETECTED 
+
+```{r include= TRUE, message=FALSE, warning=FALSE}
+
+#Sum up cumulative species detected according to habitat preference
+#NOTE: Here one bird (Eurasian Hoopoe - Upupa epops) is a grassland and scrubland bird
+#which is not included in the sum for either habitat preference 
+#this does not affect the analysis as all scrub/grassland/wetland birds removed from analysis. they account for <5% of the prop of all birds.
+
+species_habitat_sum <- species_detected_habitat%>%
+  dplyr::group_by(Site_Code, Site_Name, Site_Species_Detected, Treatment, Season)%>%dplyr::summarise(woodland_birds = sum(woodland), 
+            generalist_birds = sum(generalist), 
+            grassland_birds = sum(grassland), 
+            wetland_birds = sum(wetland), 
+            scrub_birds = sum(scrub), 
+            tropical_forest_birds = sum(tropical_forest)) 
+
+#Sum up cumulative species detected according to generalist and forest species 
+generalist_forest_sum <- species_habitat_sum%>%
+  group_by(Site_Code, Site_Name, Site_Species_Detected, Treatment, Season)%>% summarise(forest_birds = sum(woodland_birds, tropical_forest_birds), generalist_birds = sum(generalist_birds))
 
 
 ```
+
+#FIGURE 2(B): CUMULATIVE NUMBER OF GENERALIST SPECIES DETECTED
+
+This chunk of codes takes the generalist and forest birds sum to plot the cumulative number of generalists detected in the different site types. Wilcoxon test results presented in Tables S6 and S7
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+cum_generalist_detected = ggplot(generalist_forest_sum, aes(x = Treatment, y = generalist_birds, fill = Treatment)) +
+  geom_violin(width = 0.8)+
+  geom_boxplot(width=0.1, color="black", alpha=0.2) + 
+  scale_fill_manual(values = cbp)+
+  theme_classic()+ylab("")+
+  scale_y_continuous(breaks=seq(0, 80, 10)) +
+  scale_x_discrete(labels = c("LLD", "Restored", "Unrestored"))+
+  theme(legend.position = "", text = element_text(size=12),
+        axis.text.x = element_text(angle=0, hjust=0.5))
+
+```
+
+#FIGURE 2(C): CUMULATIVE FOREST AND WOODLAND AFFILIATED BIRDS DETECTED 
+This chunk of codes takes the generalist and forest birds sum to plot the cumulative number of forest and woodland affiliated birds detected in the different site types. Wilcoxon test results presented in Tables S6 and S7
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+cum_forest_detected = ggplot(generalist_forest_sum, aes(x = Treatment, y = forest_birds, fill = Treatment)) +
+  geom_violin(width = 0.8)+
+  geom_boxplot(width=0.1, color="black", alpha=0.2) + 
+  scale_fill_manual(values = cbp)+
+  theme_classic()+ ylab("")+ xlab("")+
+  scale_y_continuous(breaks=seq(0, 30, 10)) +
+  scale_x_discrete(labels = c("LLD", "Restored", "Unrestored"))+
+  theme(legend.position = "", text = element_text(size=12),
+        axis.text.x = element_text(angle=0, hjust=0.5))
+
+```
+
+#COMBINE ALL PLOTS FOR FIGURE 2
+This chunk of code puts together the three plots created above for the final figure 2 in the main manuscript. 
+
+```{r include= TRUE, message=FALSE, warning=FALSE}
+
+ggarrange(cum_num_detected, cum_generalist_detected, cum_forest_detected,
+          labels = c("A", "B", "C"),
+          nrow = 1,
+          heights = c(9, 9),
+          widths = c(8,8),
+          align = "h")
+
+```
+
+#SAVE CSV OF CUMULATIVE NUMBER OF GENERALIST AND FOREST AND WOODLAND AFFILIATED SPECIES AND TOTAL NUMBER OF SPECIES DETECTED
+
+```{r message=FALSE, warning=FALSE, include=FALSE}
+
+write.csv(generalist_forest_sum, "Winter2020-2021-generalist-forest-sum.csv")
+```
+
+#WILCOXON TEST RESULTS 
+This chunk of code creates the piared datasets used for the Wilcoxon tests which are presented in Tables S6 and Table S7
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#Create the datasets of different pairs: restored - unrestored, restored- LLD, and unrestored- LLD
+to_remove <- generalist_forest_sum %>%filter(Treatment == "No_Lantana")
+habitat_specialisation_res_unres <- anti_join(generalist_forest_sum, to_remove)
+
+to_remove <- generalist_forest_sum %>%filter(Treatment == "Unrestored")
+habitat_specialisation_res_bench <- anti_join(generalist_forest_sum, to_remove)
+
+to_remove <- generalist_forest_sum%>%filter(Treatment == "Restored")
+habitat_specialisation_unres_bench <- anti_join(generalist_forest_sum, to_remove)
+
+#year wise dataset for restored- unrestored
+habitat_specialisation_res_unres_2020 <- habitat_specialisation_res_unres%>%filter(Season == "Winter_2020")
+habitat_specialisation_res_unres_2021 <- habitat_specialisation_res_unres%>%filter(Season == "Winter_2021")
+
+#year wise dataset for restored- LLD
+habitat_specialisation_res_bench_2020 <- habitat_specialisation_res_bench%>%filter(Season == "Winter_2020")
+habitat_specialisation_res_bench_2021 <- habitat_specialisation_res_bench%>%filter(Season == "Winter_2021")
+
+#year wise dataset for unrestored- LLD
+habitat_specialisation_unres_bench_2020 <- habitat_specialisation_unres_bench%>%filter(Season == "Winter_2020")
+habitat_specialisation_unres_bench_2021 <- habitat_specialisation_unres_bench%>%filter(Season == "Winter_2021")
+
+```
+
+#TABLE S6: WILCOXON TEST RESULTS FOR BOTH YEARS
+This chunk of code is used ofr the Wilcoxon tests, the results of which are present in Table S6.
+
+```{r include=TRUE, message=FALSE, warning=FALSE}
+
+##Table S6(A): Cumulative number of species detected
+##Restored- Unrestored
+wilcox_both_years <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_res_unres, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+res_unres_birds_median <- habitat_specialisation_res_unres%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_unres_birds_median
+
+##Restored- LLD
+wilcox_both_years <-wilcox.test(Site_Species_Detected ~ Treatment, data =habitat_specialisation_res_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years 
+
+#For the median and quantile values to be reported
+res_bench_birds_median <- habitat_specialisation_res_bench%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_bench_birds_median
+
+##Unrestored -LLD
+wilcox_both_years <-wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_unres_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+unres_bench_birds_median <- habitat_specialisation_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+unres_bench_birds_median
+
+
+##Table S6(B) Cumulative number of forest and woodland affiliated birds detected
+##Restored- Unrestored
+wilcox_both_years <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_unres, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+
+#Calculate the effect size:
+abs(Zstat)/sqrt(44)
+wilcox_both_years 
+Zstat
+
+#For the median and quantile values to be reported
+res_unres_forest_birds_median <- habitat_specialisation_res_unres%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_unres_forest_birds_median
+
+##Restored - LLD 
+wilcox_both_years <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years $p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+res_bench_forest_birds_median <- habitat_specialisation_res_bench%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_bench_forest_birds_median
+
+##Unrestored - LLD
+wilcox_both_years <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_unres_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years $p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+unres_bench_forest_birds_median <- habitat_specialisation_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+unres_bench_forest_birds_median
+
+
+##Table S6(C) Cumulative number of generalist birds detected
+##Restored- Unrestored
+wilcox_both_years <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_unres, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+res_unres_generalist_birds_median <- habitat_specialisation_res_unres%>%
+  group_by(Treatment)%>%summarise(median_generalist_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_unres_generalist_birds_median
+
+##Restored - LLD
+wilcox_both_years <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+res_bench_generalist_birds_median <- habitat_specialisation_res_bench%>%
+  group_by(Treatment)%>%summarise(median_generalist_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_bench_generalist_birds_median
+
+##Unrestored- LLD
+wilcox_both_years <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_unres_bench, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+wilcox_both_years
+
+#For the median and quantile values to be reported
+unres_bench_generalist_birds_median <- habitat_specialisation_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_generalist_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+unres_bench_generalist_birds_median
+
+```
+
+#TABLE S7 (A): CUMULATIVE NUMBER OF BIRD SPECIES DETECTED IN EACH YEAR  
+This chunk of code runs the Wilcoxon tests for the results presented in Table S7(A).
+
+```{r message = FALSE, warning=FALSE, include=TRUE}
+##Part 1: Cumulative number of species detected in 2020
+##Restored - Unrestored
+wilcox_test_2020 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_res_unres_2020, 
+                                exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_unres_birds_median_2020 <- habitat_specialisation_res_unres_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_unres_birds_median_2020
+
+##Restored - LLD 
+wilcox_test_2020 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_res_bench_2020, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_bench_birds_median_2020 <- habitat_specialisation_res_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_bench_birds_median_2020
+
+##Unrestored - LLD 
+wilcox_test_2020 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_unres_bench_2020, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+unres_bench_birds_median_2020 <- habitat_specialisation_unres_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+unres_bench_birds_median_2020
+
+##Part 2: Cumulative number of species detected in 2021
+##Restored - Unrestored
+wilcox_test_2021 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_res_unres_2021, 
+                                exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_unres_birds_median_2021 <- habitat_specialisation_res_unres_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_unres_birds_median_2021
+
+##Restored - LLD 
+wilcox_test_2021 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_res_bench_2021, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_bench_birds_median_2021 <- habitat_specialisation_res_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+res_bench_birds_median_2021
+
+##Unrestored - LLD 
+wilcox_test_2021 <- wilcox.test(Site_Species_Detected ~ Treatment, data = habitat_specialisation_unres_bench_2021, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+unres_bench_birds_median_2021 <- habitat_specialisation_unres_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(Site_Species_Detected), lower_quantile = quantile(Site_Species_Detected, 0.25),upper_quantile = quantile(Site_Species_Detected, 0.75))
+unres_bench_birds_median_2021
+
+```
+
+#TABLE S7 (B): CUMULATIVE NUMBER OF FOREST AND WOODLAND SPECIES DETECTED IN EACH YEAR 
+This chunk of code runs the Wilcoxon tests for the results presented in Table S7(B).
+
+```{r include= TRUE, message=FALSE, warning=FALSE}
+
+##Part 1: Forest and woodland affiliated birds detected in 2020
+##Restored - Unrestored 
+wilcox_test_2020 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_unres_2020,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_unres_forest_birds_median_2020 <- habitat_specialisation_res_unres_2020%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_unres_forest_birds_median_2020
+
+##Restored - LLD 
+wilcox_test_2020 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_bench_2020,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_bench_forest_birds_median_2020 <- habitat_specialisation_res_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_bench_forest_birds_median_2020
+
+##Unrestored- LLD 
+wilcox_test_2020 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_unres_bench_2020,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+unres_bench_forest_birds_median_2020 <- habitat_specialisation_unres_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+unres_bench_forest_birds_median_2020
+
+##Part 2: Forest and woodland affiliated birds detected in 2021
+##Restored - Unrestored 
+wilcox_test_2021 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_unres_2021,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_unres_forest_birds_median_2021 <- habitat_specialisation_res_unres_2021%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_unres_forest_birds_median_2021
+
+##Restored - LLD 
+wilcox_test_2021 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_res_bench_2021,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_bench_forest_birds_median_2021 <- habitat_specialisation_res_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+res_bench_forest_birds_median_2021
+
+##Unrestored- LLD 
+wilcox_test_2021 <- wilcox.test(forest_birds ~ Treatment, data = habitat_specialisation_unres_bench_2021,exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+unres_bench_forest_birds_median_2021 <- habitat_specialisation_unres_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_forest_birds = median(forest_birds), lower_quantile = quantile(forest_birds, 0.25),
+upper_quantile = quantile(forest_birds, 0.75))
+unres_bench_forest_birds_median_2021
+```
+
+#TABLE S7 (C): CUMULATIVE NUMBER OF GENERALIST SPECIES DETECTED IN EACH YEAR 
+This chunk of code runs the Wilcoxon tests for the results presented in Table S7(C).
+
+```{r message= FALSE, warning=FALSE, include= TRUE}
+##Part 1: Cumulative number of generalist birds detected in 2020 
+##Restored - Unrestored
+wilcox_test_2020 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_unres_2020, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_unres_generalist_median_2020 <- habitat_specialisation_res_unres_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_unres_generalist_median_2020
+
+##Restored - LLD 
+wilcox_test_2020 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_bench_2020, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+res_bench_generalist_median_2020 <- habitat_specialisation_res_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_bench_generalist_median_2020
+
+##Unrestored - LLD 
+wilcox_test_2020 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_unres_bench_2020, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2020$p.value/2)
+Zstat
+wilcox_test_2020
+
+#For the median and quantile values to be reported
+unres_bench_generalist_median_2020 <- habitat_specialisation_unres_bench_2020%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+unres_bench_generalist_median_2020
+
+##Part 2: Cumulative number of generalist birds detected in 2021 
+##Restored - Unrestored
+wilcox_test_2021 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_unres_2021, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_unres_generalist_median_2021 <- habitat_specialisation_res_unres_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_unres_generalist_median_2021
+
+##Restored - LLD 
+wilcox_test_2021 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_res_bench_2021, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+res_bench_generalist_median_2021 <- habitat_specialisation_res_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+res_bench_generalist_median_2021
+
+##Unrestored - LLD 
+wilcox_test_2021 <- wilcox.test(generalist_birds ~ Treatment, data = habitat_specialisation_unres_bench_2021, exact = FALSE, conf.int = TRUE)
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_test_2021$p.value/2)
+Zstat
+wilcox_test_2021
+
+#For the median and quantile values to be reported
+unres_bench_generalist_median_2021 <- habitat_specialisation_unres_bench_2021%>%
+  group_by(Treatment)%>%summarise(median_birds = median(generalist_birds), lower_quantile = quantile(generalist_birds, 0.25),upper_quantile = quantile(generalist_birds, 0.75))
+unres_bench_generalist_median_2021
+
+```
+
+
+
+
+
