@@ -156,8 +156,6 @@ species_detected_habitat_sum <- species_detected_habitat%>%dplyr::mutate(general
 tropical_forest == "1" & Species_Presence>0~ "Forest-affiliated",
 TRUE~ "none"))
 
-write.csv(species_detected_habitat, "Winter2020-2021-species-detected-habitat-long.csv")
-
 ```
 
 #CALCULATE CUMULATIVE NUMBER OF FOREST AND WOODLAND AFFILIATED SPECIES DETECTED 
@@ -234,7 +232,7 @@ ggarrange(cum_num_detected, cum_generalist_detected, cum_forest_detected,
 ```
 
 #WILCOXON TEST RESULTS 
-This chunk of code creates the piared datasets used for the Wilcoxon tests which are presented in Tables S6 and Table S7
+This chunk of code creates the paired datasets used for the Wilcoxon tests which are presented in Tables S6 and Table S7
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
 
