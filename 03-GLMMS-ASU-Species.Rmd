@@ -1,0 +1,447 @@
+---
+title: "03-GLMM-Species-ASU"
+author: "Pooja Choksi"
+date: '2022-11-04'
+output: html_document
+---
+
+This chunk of code is used to fit generalized linear mixed models (GLMMS) of the following outcome variables listed below (a-d). The results of the GLMMS are provided in Table S9, S10, S11, S12, S15, S16 in the supplmentary information.
+
+(a) Cumulative number of species detected aurally 
+(b) Cumulative number of forest and woodland- affiliated species detected aurally
+(c) Cumulative number of generalist species detected aurally
+(d) Acoustic space use in the freqeuncy range of 2- 8k Hz
+
+#INSTALL ALL LIBRARIES NEEDED FOR ANALAYSIS:
+
+```{r setup, include=DALSE, message = FALSE, warning= FALSE}
+
+#Install all necessary libraries 
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(car)
+
+```
+
+#READ IN ALL DATA FOR THE ANALYSIS TO FIT GLMM MODELS
+
+```{r include = FALSE}
+
+species = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-cum-species-gen-for-detect.csv")
+  
+asu = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-ASU-Prop.csv")
+  
+predictors = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Vegetation-Census-Geographic-Predictors.csv")
+  
+```
+
+#GLMM OF CUMULATIVE NUMBER OF BIRD SPECIES DETECTED 
+This chunk of code is used to fit the GLMM for the cumulative number of species, the results of which are presented in TableS9(A). 
+
+```{r message=FALSE, warning= FALSE, include=TRUE}
+
+#first create the dataframe which includes all predictor variables and the cumulative number of species 
+
+species_predictors <- merge(species, predictors, by.x = c("Site_Code","Treatment", "Site_Name"), by.y = c("Site_Code", "Treatment", "Site_Name"))
+
+#GLMM for cumulative number of species detected in each year (Table S9A) 
+cum_detected_full <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_full)
+vif(cum_detected_full) #check for variance inflation
+
+#GLMM for cumulative number of forest and woodland- affiliated species detected in each year (Table S9B) 
+cum_for_detected <-  lme4::glmer(forest_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_for_detected)
+vif(cum_for_detected) #check for variance inflation
+
+#GLMM for cumulative number of generalist species detected in each year (Table S9C) 
+cum_gen_detected <-  lme4::glmer(generalist_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_gen_detected)
+vif(cum_gen_detected) #check for variance inflation
+
+```
+
+#ALTERNATIVE MODELS FOR CUMULATIVE NUMEBR OF BIRD SPECIES DETECTED (TABLE S10A-D)
+The following chunk of code fites the alterative GLMM models presented in Table S10(a-d). Four predictor variables including total population in 3 kms, large tree density, % farm in 3km buffer, and tree density had a correlation >0.5 (refer to Figure S1 to see correlation plot). However, in the full models present in Table S9 (models fit in chunk of code above do not display variance inflation and are thus referred to in the main manuscript).
+
+```{r message= FALSE, warning= FALSE, include=TRUE}
+
+#Alternative model (a) 
+#model without Total pop in 3kms 
+cum_detected_alt1 <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt1)
+vif(cum_detected_alt1)
+
+#Alternative model (b)
+#model without large tree density
+cum_detected_alt2 <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt2)
+vif(cum_detected_alt2)
+
+#Alternative model (c)
+#GLMM without % farms in 3 km buffer
+cum_detected_alt3 <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt3)
+vif(cum_detected_alt3)
+
+#Alternative model (d)
+#GLMM without tree density
+cum_detected_alt4 <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt4)
+vif(cum_detected_alt4)
+
+```
+
+#ALTERNATIVE MODELS FOR CUMUALTIVE FOREST- AND WOODLAND- AFFILIATED SPECIES DETECTED (Table S11A-D)
+The following chunk of code fites the alterative GLMM models presented in Table S11(a-d). Four predictor variables including total population in 3 kms, large tree density, % farm in 3km buffer, and tree density had a correlation >0.5 (refer to Figure S1 to see correlation plot). However, in the full models presented in Table S9B (models fit in chunk of code above) do not display variance inflation and are thus referred to in the main manuscript.
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#Alternative model (a) 
+#model without Total pop in 3kms 
+cum_detected_alt1 <-  lme4::glmer(forest_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt1)
+vif(cum_detected_alt1)
+
+#Alternative model (b)
+#model without large tree density
+cum_detected_alt2 <-  lme4::glmer(forest_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt2)
+vif(cum_detected_alt2)
+
+#Alternative model (c)
+#GLMM without % farms in 3 km buffer
+cum_detected_alt3 <-  lme4::glmer(forest_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt3)
+vif(cum_detected_alt3)
+
+#Alternative model (d)
+#GLMM without tree density
+cum_detected_alt4 <-  lme4::glmer(forest_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt4)
+vif(cum_detected_alt4)
+
+```
+
+
+#ALTERNATIVE MODELS FOR CUMUALTIVE NUMBER OF GENERALIST SPECIES DETECTED (Table S12A-D)
+The following chunk of code fites the alterative GLMM models presented in Table S11(a-d). Four predictor variables including total population in 3 kms, large tree density, % farm in 3km buffer, and tree density had a correlation >0.5 (refer to Figure S1 to see correlation plot). However, in the full models presented in Table S9C (models fit in chunk of code above) do not display variance inflation and are thus referred to in the main manuscript.
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#Alternative model (a) 
+#model without Total pop in 3kms 
+cum_detected_alt1 <-  lme4::glmer(generalist_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt1)
+vif(cum_detected_alt1)
+
+#Alternative model (b)
+#model without large tree density
+cum_detected_alt2 <-  lme4::glmer(generalist_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt2)
+vif(cum_detected_alt2)
+
+#Alternative model (c)
+#GLMM without % farms in 3 km buffer
+cum_detected_alt3 <-  lme4::glmer(generalist_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(Total_Trees)+ #Tree density
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt3)
+vif(cum_detected_alt3)
+
+#Alternative model (d)
+#GLMM without tree density
+cum_detected_alt4 <-  lme4::glmer(generalist_birds~ #cum species detected at each sampling location (recorder location) computed in script 01
+Treatment + #restored, unrestored or LLD 
+scale(TotalPop_3km) + #total human population in 3kms
+scale(Total_Big_Trees) + #Large tree density 
+scale(Farms_3km) + #farm land cover in 3 kms 
+scale(Forest_3km) + #forest cover in 3kms
+scale(Simpson_Index_All_Trees) + #diversity of all small, medium and large trees
+  factor(Season)+ #year 2020 or 2021 
+  (1| Site_Name), #sampling site (N =20)
+family = "poisson", data= species_predictors)
+
+summary(cum_detected_alt4)
+vif(cum_detected_alt4)
+
+```
+
+#GLMM OF ACOUSTIC SPACE USE (TABLE S15)
+This chunk of code is used to fit the GLMM for the acoustic space used in the 2000-8000 Hz frequency range, the results of which are presented in TableS15. 
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#First create a dataframe of the ASU and the predictor variables 
+#ASU between 2 to 8k Hz
+asu_low = asu%>%filter(Frequency_128> 10 & Frequency_128< 44)
+
+#drop AO_3
+to_remove = asu_low%>%filter(Site_Code == "AO_3")
+asu_low = anti_join(asu_low, to_remove)
+
+year2020 = asu_low%>%filter(Season== "Winter_2020")
+year2020_AO = year2020%>%filter(Site_Code == c("AO_1", "AO_2"))
+asu_low = anti_join(asu_low, year2020_AO)
+
+asu_predictors <- merge(asu_low, predictors, by.x = c("Site_Code","Treatment"), by.y = c("Site_Code", "Treatment"))
+
+#For the GLMM we need to present the outcome variable as a cbind of files with peaks in 2-8k Hz range and files without peaks 
+#this is exactly the same as the columns 'Prop_ASU' used for the Wilcoxon tests in 02
+#we only present the outcome variable this way as the GLMM requires the cbind 
+asu_predictors_avg = asu_predictors%>%group_by(Site_Code, Site_Name, 
+                                 Year,Total_Trees, Total_Big_Trees,Avg_dB_SPL,
+                             TotalPop_3km, Forest_3km, 
+                             Farms_3km, Simpson_Index_All_Trees, 
+                             Treatment, Time_24, Date_Recorded)%>%
+  summarise_at(.vars = vars(File_Count, Total_files),
+               .funs=c(sum = "sum"))
+
+asu_full <-  lme4::glmer(cbind(File_Count_sum/ (Total_files_sum-File_Count_sum))~ #proportion of the acoustic space used to not used  
+factor(Treatment) + #restored, unrestored or LLD 
+scale(Total_Trees)+ #tree density 
+  scale(TotalPop_3km) + #total population in 3km buffer
+scale(Total_Big_Trees) + #Large tree density in 3km buffer
+scale(Farms_3km) + #% farm in 3 km buffer 
+  scale(Forest_3km) + #% forest in 3km buffer
+factor(Year) + #year 2020 or 2021
+scale(Simpson_Index_All_Trees) + #diversity of small, medium and large trees
+  (1|Site_Name) + #Sampling sites (N=20)  
+  (1| Date_Recorded)+ #julian date of recording (N=100) 
+  (1 | Time_24), #time in 24 hours (N=24)
+family = "binomial",
+glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)),
+data= asu_predictors_avg)
+
+summary(asu_full)
+vif(asu_full)
+```
+
+#ALTERNATIVE MODELS FOR ACOUSTIC SPACE USED IN 2000-8000 HZ RANGE (Table S16A-D)
+The following chunk of code fites the alterative GLMM models presented in Table S16(a-d). Four predictor variables including total population in 3 kms, large tree density, % farm in 3km buffer, and tree density had a correlation >0.5 (refer to Figure S1 to see correlation plot). However, in the full models presented in Table S9A (models fit in chunk of code) above do not display variance inflation and are thus referred to in the main manuscript.
+
+```{r message= FALSE, warning=FALSE, include=TRUE}
+
+#Alternative model (a)
+#GLMM without total population in 3kms
+asu_alt1 <-  lme4::glmer(cbind(File_Count_sum/ (Total_files_sum-File_Count_sum))~ #proportion of the acoustic space used to not used  
+factor(Treatment) + #restored, unrestored or LLD 
+scale(Total_Trees)+ #tree density 
+scale(Total_Big_Trees) + #Large tree density in 3km buffer
+scale(Farms_3km) + #% farm in 3 km buffer 
+  scale(Forest_3km) + #% forest in 3km buffer
+factor(Year) + #year 2020 or 2021
+scale(Simpson_Index_All_Trees) + #diversity of small, medium and large trees
+  (1|Site_Name) + #Sampling sites (N=20)  
+  (1| Date_Recorded)+ #julian date of recording (N=100) 
+  (1 | Time_24), #time in 24 hours (N=24)
+family = "binomial",
+glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)),
+data= asu_predictors_avg)
+
+summary(asu_alt1)
+vif(asu_alt1)  
+
+#Alternative model (b)
+#GLMM without large tree density
+asu_alt2 <-  lme4::glmer(cbind(File_Count_sum/ (Total_files_sum-File_Count_sum))~ #proportion of the acoustic space used to not used  
+factor(Treatment) + #restored, unrestored or LLD 
+scale(Total_Trees)+ #tree density 
+scale(Farms_3km) + #% farm in 3 km buffer 
+  scale(Forest_3km) + #% forest in 3km buffer
+factor(Year) + #year 2020 or 2021
+scale(Simpson_Index_All_Trees) + #diversity of small, medium and large trees
+  (1|Site_Name) + #Sampling sites (N=20)  
+  (1| Date_Recorded)+ #julian date of recording (N=100) 
+  (1 | Time_24), #time in 24 hours (N=24)
+family = "binomial",
+glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)),
+data= asu_predictors_avg)
+
+summary(asu_alt2)
+vif(asu_alt2)
+
+#Alternative model (c)
+#GLMM without % farms in 3 km buffer
+asu_alt3 <-  lme4::glmer(cbind(File_Count_sum/ (Total_files_sum-File_Count_sum))~ #proportion of the acoustic space used to not used  
+factor(Treatment) + #restored, unrestored or LLD 
+scale(Total_Trees)+ #tree density 
+scale(Total_Big_Trees) + #Large tree density in 3km buffer
+  scale(Forest_3km) + #% forest in 3km buffer
+factor(Year) + #year 2020 or 2021
+scale(Simpson_Index_All_Trees) + #diversity of small, medium and large trees
+  (1|Site_Name) + #Sampling sites (N=20)  
+  (1| Date_Recorded)+ #julian date of recording (N=100) 
+  (1 | Time_24), #time in 24 hours (N=24)
+family = "binomial",
+glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)),
+data= asu_predictors_avg)
+
+summary(asu_alt3)
+vif(asu_alt3)
+
+#Alternative model (d)
+#GLMM without tree density 
+asu_alt4 <-  lme4::glmer(cbind(File_Count_sum/ (Total_files_sum-File_Count_sum))~ #proportion of the acoustic space used to not used  
+factor(Treatment) + #restored, unrestored or LLD 
+scale(Total_Big_Trees) + #Large tree density in 3km buffer
+scale(Farms_3km) + #% farm in 3 km buffer 
+  scale(Forest_3km) + #% forest in 3km buffer
+factor(Year) + #year 2020 or 2021
+scale(Simpson_Index_All_Trees) + #diversity of small, medium and large trees
+  (1|Site_Name) + #Sampling sites (N=20)  
+  (1| Date_Recorded)+ #julian date of recording (N=100) 
+  (1 | Time_24), #time in 24 hours (N=24)
+family = "binomial",
+glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 100000)),
+data= asu_predictors_avg)
+
+summary(asu_alt4)
+vif(asu_alt4)
+
+```
+
+#END
