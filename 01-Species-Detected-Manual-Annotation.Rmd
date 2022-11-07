@@ -5,7 +5,9 @@ date: '2022-11-03'
 output: html_document
 
 ---
-This chunk of code is used to calculate the cumulative number of species detected from manual annotation of randomly selected acoustic data between 5:30 to 9:30 AM over data from 2020 and 2021. Each figure and table in the main manuscript and supplementary information has been referenced in the description of the separate chunks of code.  
+
+This chunk of code is used to calculate the cumulative number of species detected from manual annotation of randomly selected acoustic data between 5:30 to 9:30 AM over data from 2020 and 2021. Each figure and table in the main manuscript and supplementary information has been referenced in the description of the separate chunks of code. 
+
 
 #INSTALL ALL LIBRARIES NEEDED FOR ANALAYSIS:
 
@@ -656,11 +658,14 @@ unres_bench_generalist_median_2021
 ```
 
 #WRITE THE FILE USED FOR GLMMS IN 03-GLMM-ASU-SPECIES-DETECTED
-This file of total species detected and the number of generalists and specialists will be used for the generalized linear mixed models run in R script 03. 
+This file of total species detected and the number of generalists and specialists (generalist-forest-sum) will be used for the generalized linear mixed models run in R script 03. 
 
 ```{r message=FALSE, include= FALSE, warning=FALSE}
-
+#Cum Species detected, forest- and woodland-affiliated birds
 write.csv(generalist_forest_sum, "Winter2020-2021-cum-species-gen-for-detect.csv")
+
+#Species-specific number of observations at a sampling location for reference (this csv is only to further explore data and not used in any scripts/models)
+write.csv(total_species_detected, "Winter2020-2021-species-detection-samploc.csv")
 
 ```
 
