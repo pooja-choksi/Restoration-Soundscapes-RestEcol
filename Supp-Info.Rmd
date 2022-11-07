@@ -1,0 +1,285 @@
+---
+title: "Supp-Info"
+author: "Pooja Choksi and Mayuri Kotian"
+date: '2022-11-07'
+output: html_document
+---
+
+This chunk of code is used to create Supplementary information Tables S4 and S5 that provide information on the number of 10-second clips analyzed in this study and the complete of birds detected aurally. 
+
+#INSTALL ALL LIBRARIES
+```{r message=FALSE, include=FALSE, warning=FALSe}
+
+library(dplyr)
+library(tidyverse)
+library(jtools)
+library(ggmcmc)
+library(data.table)
+library(vegan)
+library(viridis)
+
+```
+
+#READ IN ALL DATA REQUIRED 
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#CSV of manual annotations of 10-second segments (raw data) of randomly selected data for each sampling location (recorder location)
+Data_annotation <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-data-annotation-merged.csv")
+
+Data_annotation = select(Data_annotation, -X)
+
+#CSV of species habitat preference 
+species_habitat <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Bird_Mammal_Species_List_Mandla_20211211.csv")
+
+#Remove the mammals in this list 
+species_habitat <- head(species_habitat,-10)
+
+#CSV of vegetation variables 
+vegetation = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Vegetation-Census-Geographic-Predictors.csv")
+
+```
+
+#SUPPLEMENTARY TABLE S1
+THe following variables were extracted from the Census 2011 (Government of India) data. The data is publicly avaiable and we are not permitted to share. 
+Variables extracted from the Census 2011 data include: 
+(1) Total population of village
+(2) Total households in village
+(3) Percent Literate in village
+(4) Percent Scheduled Tribe in village
+(5) Percent Scheduled Caste in village
+
+For the first propensity score match (presented in Table S1), we classified LANDSAT 8 to derive 7 land covers  (2019 scene:  https://code.earthengine.google.com/3d8ca9ec6d725c703bb9d88018c1f1a2). Land covers are: open shrub, water, less dense forest, dense forest, bare ground, village/urban/impervious. 
+
+#SUPPLEMENTARY TABLE S3
+As data collected in these sites and for PC's doctoral dissertation, we are unable to share the raw vegetation data collected on the basis of which several vegetation composition and structural metrics have been created (more manuscripts in review currently). This chunk of code is presents the results of the Wilcoxon test on vegetation metrics:
+(1) Sapling density 
+(2) Small tree density
+(3) Medium tree density
+(4) L.camara density
+
+We present these details to provide the reader an idea of the vegetation structure, especially the understory density (predominantly L. camara).
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#first filter out each treatment
+restored <- vegetation%>%filter(Treatment =="Restored")
+unrestored <- vegetation%>%filter(Treatment == "Unrestored")
+benchmark <- vegetation%>%filter(Treatment == "No_Lantana")
+
+#Create paired datasets 
+res_unres <- anti_join(vegetation, benchmark)
+unres_bench = anti_join(vegetation, restored)
+res_bench  = anti_join(vegetation, unrestored)
+
+#Wilcoxon tests for each variables 
+##Restored -Unrestored 
+wilcox_lantana <- wilcox.test(Lantana_Density~ Treatment,data = res_unres,  conf.int = TRUE, exact = FALSE)
+wilcox_lantana
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_lantana$p.value/2)
+Zstat
+
+#medium trees 
+wilcox_medium<- wilcox.test(Total_Medium_Trees ~ Treatment, data = res_unres, 
+exact = FALSE, conf.int= TRUE)
+wilcox_medium
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_medium$p.value/2)
+Zstat
+
+#small trees
+wilcox_small<- wilcox.test(Total_Small_Trees ~ Treatment, data = res_unres, 
+          exact = FALSE, conf.int= TRUE)
+wilcox_small
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_small$p.value/2)
+Zstat
+
+#saplings 
+wilcox_sapling<- wilcox.test(Total_Tree_Sapling_Seedling ~ Treatment, data = res_unres,exact = FALSE, conf.int = TRUE)
+wilcox_sapling
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_sapling$p.value/2)
+Zstat
+
+#Restored - LLD 
+#Lantana density 
+wilcox_lantana <- wilcox.test(Lantana_Density~ Treatment,data = res_bench, 
+exact = FALSE, conf.int = TRUE )
+wilcox_lantana
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_lantana$p.value/2)
+Zstat
+
+#medium trees
+wilcox_medium<- wilcox.test(Total_Medium_Trees ~ Treatment, data = res_bench, 
+exact = FALSE, conf.int = TRUE)
+wilcox_medium
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_medium$p.value/2)
+Zstat
+
+#small trees
+wilcox_small<- wilcox.test(Total_Small_Trees ~ Treatment, data = res_bench, 
+exact = FALSE, conf.int = TRUE)
+wilcox_small
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_small$p.value/2)
+Zstat
+
+#saplings
+wilcox_sapling<- wilcox.test(Total_Tree_Sapling_Seedling ~ Treatment, data = res_bench,exact = FALSE, conf.int = TRUE)
+wilcox_sapling
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_sapling$p.value/2)
+Zstat
+
+#Unrestored - LLD 
+wilcox_lantana <- wilcox.test(Lantana_Density~ Treatment,data = res_unres,  conf.int = TRUE, exact = FALSE)
+wilcox_lantana
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_lantana$p.value/2)
+Zstat
+
+#medium trees 
+wilcox_medium<- wilcox.test(Total_Medium_Trees ~ Treatment, data = res_unres, 
+exact = FALSE, conf.int= TRUE)
+wilcox_medium
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_medium$p.value/2)
+Zstat
+
+#small trees
+wilcox_small<- wilcox.test(Total_Small_Trees ~ Treatment, data = res_unres, 
+          exact = FALSE, conf.int= TRUE)
+wilcox_small
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_small$p.value/2)
+Zstat
+
+#saplings 
+wilcox_sapling<- wilcox.test(Total_Tree_Sapling_Seedling ~ Treatment, data = res_unres,exact = FALSE, conf.int = TRUE)
+wilcox_sapling
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_sapling$p.value/2)
+Zstat
+
+#Restored - LLD 
+#Lantana density 
+wilcox_lantana <- wilcox.test(Lantana_Density~ Treatment,data = unres_bench, 
+exact = FALSE, conf.int = TRUE )
+wilcox_lantana
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_lantana$p.value/2)
+Zstat
+
+#medium trees
+wilcox_medium<- wilcox.test(Total_Medium_Trees ~ Treatment, data = unres_bench, 
+exact = FALSE, conf.int = TRUE)
+wilcox_medium
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_medium$p.value/2)
+Zstat
+
+#small trees
+wilcox_small<- wilcox.test(Total_Small_Trees ~ Treatment, data = unres_bench, 
+exact = FALSE, conf.int = TRUE)
+wilcox_small
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_small$p.value/2)
+Zstat
+
+#saplings
+wilcox_sapling<- wilcox.test(Total_Tree_Sapling_Seedling ~ Treatment, data = unres_bench,exact = FALSE, conf.int = TRUE)
+wilcox_sapling
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_sapling$p.value/2)
+Zstat
+
+#use quantile() for every variable to get the median, 1st and 3trd quantile presented in the tables
+
+```
+
+#SUPPLEMENTARY TABLE S4
+This chunk of code produces Tabe S4 presented in the supplementary information.
+
+```{r message=FALSE, warning=FALSE, include= TRUE}
+
+# Selecting columns required for counting number of files for each sampling site
+NewData<-select(Data_annotation, c(filename, Site_Name, Treatment, Site_Code, Season))
+
+#Remove duplicate rows, if any
+NewData<-NewData[!duplicated(NewData), ]
+
+#Applying aggregate to count the numbe rof unique 10-second files anaalysed for each sampling location for each sampling site per year
+data_count_1 <- aggregate(data = NewData, filename ~ Site_Name + Season + Treatment + Site_Code, function(x) length(unique(x)))
+
+#Rename column
+colnames(data_count_1)[5] <- 'Total_number_of_files'
+
+write.csv(data_count_1, "TableS4.csv")
+
+```
+
+#SUPPLEMENTARY TABLE S5
+This chunk of code produces Table S5, which provides a list of bird species detected across all sites over two seasons (2020 and 2021). Additionally, the table provides the total number of sites (restored, unrestored and LLD sites) at which the bird was detected. 
+
+```{r message=FALSE, warning=FALSE, include= TRUE}
+
+#Select birds detected in annotation from all the bird codes
+SPData <- Data_annotation%>% select(one_of(species_habitat$Name_Code), Treatment, Site_Name,Site_Code) 
+
+# Convert table to long form so all species codes are in a single column
+SpeciesData <- SPData %>%
+  pivot_longer(!c(Site_Name,Treatment,Site_Code), 
+               names_to = "Species_code", values_to = "Presence/absence")
+
+#Subset data for rows where species is present, i.e., Present/Absent = 1
+species_present <- subset(SpeciesData, SpeciesData$`Presence/absence`==1)
+
+#Remove duplicate rows, if any
+NewData<-species_present[!duplicated(species_present), ]
+
+#Remove column containg sampling location (recorder location) information
+NewData = subset(NewData, select = -c(Site_Code) )
+colnames(NewData)[3]<-"Name_Code" #Rename column for consistency
+
+#Merge above dataframe with Bird species datafor acquiring species details
+NewData<-merge.data.frame(species_habitat, NewData, by.x = "Name_Code", by.y = "Name_Code", all.y = TRUE)
+
+NewData<-select(NewData, -c(6)) # Remove unwanted column
+
+# Replace NA values, if any
+SpeciesData<-NewData %>% replace_na(list(Treatment = "None"))
+
+#Applying aggregate to count the number of sites where species are present for each Site type
+data_count_1 <- aggregate(data = SpeciesData, Site_Name ~ Name_Code + Treatment + Common_Name + Scientific_Name + Habitat_specialization, function(x) length(unique(x)))
+
+#Converting table to wide form to get a column for each of the three site types
+data_count_1 <- data_count_1 %>%
+  pivot_wider(names_from = "Treatment", 
+              values_from = "Site_Name") ## Table in wide format for analysis
+
+#Replace NA values with 0
+data_count_1[is.na(data_count_1)] = 0
+
+#Data_count_1 is Table S4 where we find that 139 species were detected aurally. 
+
+```
+
