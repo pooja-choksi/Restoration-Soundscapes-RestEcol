@@ -31,7 +31,7 @@ library(car)
 
 species = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-cum-species-gen-for-detect.csv")
   
-asu = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-ASU-Prop.csv")
+asu = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-ASU-Prop-2-8k.csv")
   
 predictors = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Vegetation-Census-Geographic-Predictors.csv")
   
@@ -315,18 +315,7 @@ This chunk of code is used to fit the GLMM for the acoustic space used in the 20
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
 
-#First create a dataframe of the ASU and the predictor variables 
-#ASU between 2 to 8k Hz
-asu_low = asu%>%filter(Frequency_128> 10 & Frequency_128< 44)
-
-#drop AO_3
-to_remove = asu_low%>%filter(Site_Code == "AO_3")
-asu_low = anti_join(asu_low, to_remove)
-
-year2020 = asu_low%>%filter(Season== "Winter_2020")
-year2020_AO = year2020%>%filter(Site_Code == c("AO_1", "AO_2"))
-asu_low = anti_join(asu_low, year2020_AO)
-
+#combine the dataframes of ASU and predictors
 asu_predictors <- merge(asu_low, predictors, by.x = c("Site_Code","Treatment"), by.y = c("Site_Code", "Treatment"))
 
 #For the GLMM we need to present the outcome variable as a cbind of files with peaks in 2-8k Hz range and files without peaks 
