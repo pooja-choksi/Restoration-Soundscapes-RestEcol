@@ -75,7 +75,7 @@ drop.cols <- c("Uniqueid",
                #also remove all the mammals from the data
                "NPLA","RHMA","TSPS","SPDE","BADE", "GOJA", "BLBU", "GAUR", "Rain_Wind","WIBO", "SADE")
 
-species_per_site <-species_per_site%>%dplyr::select(-one_of(drop.cols))
+species_per_site<-species_per_site%>% dplyr::select(-one_of(drop.cols))
 
 #Remove NAs in columns from manual annotation
 species_per_site<-  species_per_site%>%group_by(Site_Code, Site_Name, Treatment, Season)%>%
@@ -83,18 +83,18 @@ species_per_site<-  species_per_site%>%group_by(Site_Code, Site_Name, Treatment,
 
 #Using the totals from species_per_Site, we calculate cumulative species detected per year
 #first note species presence/ absence in the totals
-total_species_detected <- species_per_site %>% mutate_if(is.numeric, ~1 * (. > 0))
+species_presence_absence <- species_per_site %>% mutate_if(is.numeric, ~1 * (. > 0))
 
 #sum all species presences at sampling location for total species detected per year
-total_species_detected <- total_species_detected%>%mutate(Site_Species_Detected= rowSums(across(where(is.numeric))))
+species_presence_absence <- species_presence_absence%>%mutate(Site_Species_Detected= rowSums(across(where(is.numeric))))
 
-#add total species richness from the species richness file to species_per_site file 
-total_species_detected <- merge(species_per_site, total_species_detected[,c("Site_Species_Detected", "Site_Code", "Season")],by.x= c("Site_Code", "Season"), by.y= c("Site_Code", "Season"))
+#add total nubmer of species detected from the 'total species detected' file to species_per_site file 
+total_species_detected <- merge(species_per_site, species_presence_absence[,c("Site_Species_Detected", "Site_Code", "Season")],by.x= c("Site_Code", "Season"), by.y= c("Site_Code", "Season"))
 
 ```
 
 #FIGURE 2(A) CUMULATIVE NUMBER OF SPECIES DETECTED 
-This chunk of code is to make the violin plot in Fig 2A of the cumulative number of species deteced in the sites. Wilcoxon test results presented in Tables S6 and S7
+This chunk of code is used to make the violin plot in Fig 2A of the cumulative number of species deteced in the sites. Wilcoxon test results presented in Tables S6 and S7
 
 ```{r message=FALSE, warning=FALSE, include=TRUE}
 #FIG 3A: Cumulative number of species detected
@@ -661,8 +661,11 @@ unres_bench_generalist_median_2021
 This file of total species detected and the number of generalists and specialists (generalist-forest-sum) will be used for the generalized linear mixed models run in R script 03. 
 
 ```{r message=FALSE, include= FALSE, warning=FALSE}
-#Cum Species detected, forest- and woodland-affiliated birds
+#Cum Species detected, forest- and woodland-affiliated birds for GLMMs on script 03
 write.csv(generalist_forest_sum, "Winter2020-2021-cum-species-gen-for-detect.csv")
+
+#Species presence absence matrix for GLMMs in script 03 and PERMANOVA in 04
+write.csv(species_presence_absence, "Winter2020-2021-sp-pres-abs.csv")
 
 #Species-specific number of observations at a sampling location for reference (this csv is only to further explore data and not used in any scripts/models)
 write.csv(total_species_detected, "Winter2020-2021-species-detection-samploc.csv")

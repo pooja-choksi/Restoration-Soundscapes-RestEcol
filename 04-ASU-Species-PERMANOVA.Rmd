@@ -1,0 +1,114 @@
+---
+title: "04-ASU-Species-PERMANOVA"
+author: "Pooja Choksi and Mayuri Kotian"
+date: '2022-11-08'
+output: html_document
+---
+
+This chunk of code is used to carry out a PERMANOVA for two outcome variables:
+(1) Cumulative number of species detected
+(2) Acoustic space used in the 2000-8000 Hz range 
+
+The results of PERMANOVA for each of these outcome variables is presented in Table S8 and Table S13. 
+
+#INSTALL ALL LIBRARIES
+```{r message=FALSE, include=FALSE, warning=FALSE}
+library(vegan)
+library(viridis)
+library(dplyr)
+library(tidyverse)
+
+```
+
+#READ IN ALL DATA
+```{r message=FALSE,include=TRUE, warning=FALSE}
+
+#CSV of Acoustic space use 
+asu_low = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-ASU-Prop-2-8k.csv")
+
+#CSV of Species presence and absence 
+species_presence_absence = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-sp-pres-abs.csv")
+
+#CSV of predictor variables 
+Exp_vars <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Vegetation-Census-Geographic-Predictors.csv")
+
+```
+
+#PERMANOVA OF BIRD SPECIES PRESENCE ABSENCE
+This chunk of code is used to run a PERMANOVA on the bird community based on manually annotated presence and absences in 10-second audio clips. The results of this analysis are presented in Table S8.
+
+```{r message= TRUE, warning=FALSE, include=TRUE}
+
+#create the dataframe with species presence absence data and the explanatory variables 
+species_predictors = merge(species_presence_absence, Exp_vars, by.x= c("Site_Code", "Treatment", "Site_Name"), by.y = c("Site_Code", "Treatment", "Site_Name"))
+  
+permanova_species = adonis(species_predictors[ , 6:177] ~Total_Trees+ Treatment + Season+ Site_Name + Total_Big_Trees+ TotalPop_3km +Forest_3km + Farms_3km + Simpson_Index_All_Trees, data= species_predictors, permutations =999)
+permanova_species$aov.tab
+
+
+```
+
+#PERMANOVA OF ACOUSTIC SAPCE USED 
+
+This chunk of code is used to run a PERMANOVA on the ASU. The results of this analysis are presented in Table S13. 
+
+```{r message=FALSE,include=TRUE, warning=FALSE}
+set.seed(123456) 
+
+#Recalculating Percent ASU
+asu_low$Percent_ASU <- (asu_low$File_Count/asu_low$Total_files)*100 
+
+#Remove columns not required for PERMANOVA analysis and store dataframe as a new object
+prop_8k_asu <- subset(asu_low, select = -c(9,10)) 
+
+# Remove duplicate rows if any
+prop_8k_asu <- prop_8k_asu[!duplicated(prop_8k_asu),] 
+
+# Calculate average Percent ASU per Time x Freq bin grouped by Year, Treatment and sampling location per day
+prop_8k_asu <-prop_8k_asu %>% dplyr::group_by(Treatment, Site_Code, Year, Time_24, Frequency_128) %>% dplyr::summarise(Percent_ASU = mean(Percent_ASU)) 
+
+# Combining Time and Frequency labels to create a single label representing each Time x Freq bin hereafter
+prop_8k_asu$Time_Freq_bin <- paste(prop_8k_asu$Time_24, prop_8k_asu$Frequency_128, sep = "Time-Freq")
+
+#Create a Season (Year) column to merge with the ASU data
+Exp_vars_2020 = Exp_vars
+Exp_vars_2020$Season <- 2020
+
+Exp_vars_2021 = Exp_vars
+Exp_vars_2021$Season <- 2021
+
+Exp_vars = rbind(Exp_vars_2020, Exp_vars_2021)
+
+#Converting the dataframe from long form to wide form for PERMANOVA analysis
+prop_8k_asu_wide <- prop_8k_asu %>%
+  pivot_wider(!c(Time_24,Frequency_128), names_from = "Time_Freq_bin", values_from = "Percent_ASU") ## Table in wide format for analysis
+
+#Extracting variables with sampling locations and site names to add to dataframe with percent ASU 
+SN <- data.frame(Exp_vars$Site_Code, Exp_vars$Site_Name) 
+
+#Renaming columns to match both dataframes
+colnames(SN)[1] <- 'Site_Code' 
+colnames(SN)[2] <- 'Site_Name'
+
+#Remove duplicate rows, if any
+SN <- SN[!duplicated(SN),]
+
+#sampling location codes with site names 
+prop_8k_asu_wide <- merge(SN, prop_8k_asu_wide, by.x = "Site_Code", by.y = "Site_Code")
+
+#check for all site names
+unique(prop_8k_asu_wide$Site_Name)
+
+#Replace NA values with 0 before input to PERMANOVA
+prop_8k_asu_wide[is.na(prop_8k_asu_wide)] = 0
+
+# Computing PERMANOVA results
+permanova_2 = adonis(prop_8k_asu_wide[ , 5:(ncol(prop_8k_asu_wide))] ~ Total_Trees + Treatment + Season + Site_Name+ Total_Big_Trees + TotalPop_3km +Forest_3km + Farms_3km + Simpson_Index_All_Trees, data = Exp_vars, permutations = 999)
+permanova_2
+permanova_2$aov.tab   
+
+```
+
+#END
+
+
