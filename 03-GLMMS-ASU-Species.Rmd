@@ -29,11 +29,11 @@ library(car)
 
 ```{r include = FALSE}
 
-species = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-cum-species-gen-for-detect.csv")
+species = read.csv("Winter2020-2021-cum-species-gen-for-detect.csv")
   
-asu = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-ASU-Prop-2-8k.csv")
+asu = read.csv("Winter2020-2021-ASU-Prop-2-8k.csv")
   
-predictors = read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Vegetation-Census-Geographic-Predictors.csv")
+predictors = read.csv("Vegetation-Census-Geographic-Predictors.csv")
   
 ```
 
@@ -45,6 +45,9 @@ This chunk of code is used to fit the GLMM for the cumulative number of species,
 #first create the dataframe which includes all predictor variables and the cumulative number of species 
 
 species_predictors <- merge(species, predictors, by.x = c("Site_Code","Treatment", "Site_Name"), by.y = c("Site_Code", "Treatment", "Site_Name"))
+
+#define the levels, so that unrestored becomes the reference level
+species_predictors$Treatment <- factor(species_predictors$Treatment, levels = c("Unrestored", "Restored", "No_Lantana"))
 
 #GLMM for cumulative number of species detected in each year (Table S9A) 
 cum_detected_full <-  lme4::glmer(Site_Species_Detected~ #cum species detected at each sampling location (recorder location) computed in script 01

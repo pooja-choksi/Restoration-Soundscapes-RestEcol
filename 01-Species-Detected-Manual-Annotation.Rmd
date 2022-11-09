@@ -29,12 +29,12 @@ library(ggpubr)
 ```{r include= FALSE, message = FALSE, warning=FALSE}
 
 #CSV of manual annotations of 10-second segments (raw data) of randomly selected data for each sampling location (recorder location)
-Data_annotation <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Winter2020-2021-data-annotation-merged.csv")
+Data_annotation <- read.csv("Winter2020-2021-data-annotation-merged.csv")
 
 Data_annotation = select(Data_annotation, -X)
 
 #CSV of species habitat preference 
-species_habitat <- read.csv("C:\\Users\\pooja\\Documents\\GitHub\\Restoration-Soundscapes-RestEcol\\Bird_Mammal_Species_List_Mandla_20211211.csv")
+species_habitat <- read.csv("Bird_Mammal_Species_List_Mandla_20211211.csv")
 
 
 ```
