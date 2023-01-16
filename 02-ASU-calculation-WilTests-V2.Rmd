@@ -1,0 +1,438 @@
+---
+title: "02-ASU-calculation-WilTests"
+author: "Pooja Choksi and Mayuri Kotian"
+date: '2022-11-04'
+output: html_document
+---
+
+This chunk of code is used to calculate the acoustic space used (ASU) from the data collected in 2020 and 2021. Given the large size of the acoustic dataset (>2 TB), we are sharing the code to compute peak frequencies for the reader's reference, but are unable to share the raw acoustic files used to create the response variable. All other parts of this script can be run with data provided. The code provided is used to create Figure 3 in the main manuscript and Table S13 and S14. 
+
+#INSTALL ALL LIBRARIES NEEDED FOR ANALAYSIS:
+
+```{r setup, include=DALSE, message = FALSE, warning= FALSE}
+
+#Install all necessary libraries 
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(tuneR)
+library(seewave)
+library(soundecology)
+library("scales")
+
+```
+
+#EXTRACTING PEAK FREQEUNCIES USED TO CALCULATE ACOUSTIC SPACE USE 
+Using this chunk of code, for each 1-minute of recording, we extracted the peak frequencies, which is used to compute the acoustic space used in the next chunk of code (We have provided this chunk of code for reference and have not shared the acoustic raw data used to compute the frequencies due to the data's large size).
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+## Reading 1-minute files to compute peak frequency values
+file_list=list.files(path = getwd(), pattern = "-")
+file_list
+Dataset = data.frame()
+
+## Loop for computing peak frequencies data set for every sampling location (recorder location)
+for (i in 1:length(file_list)){
+  temp_data <- readWave(file_list[i])
+  ms = meanspec(temp_data, norm = FALSE)
+  Peaks= fpeaks(ms, freq=0, plot=TRUE)
+  Peaks=as.data.frame(as.table(Peaks)) ##Converting matrix to Data frame
+  Peaks['File_Index']=i ##Adding File index
+  x=sub('.*(\\d{6}).*', '\\1', file_list[i]) ## Extracting time from file name
+  Peaks['Time_Recorded']=x ##Storing time as a column in new data frame
+  z=sub('.*(\\d{8}).*', '\\1', file_list[i]) ## Extracting date from file name
+  Peaks['Date_Recorded']=z ##Storing date as a column in new data frame
+  y=sub('*', '\\1', file_list[i]) ##Extracting file name and storing it
+  Peaks['Filename']=y
+  Dataset = bind_rows(Dataset, Peaks)
+}
+Dataset
+
+##Extracting Amplitude, Time and Frequency which are required for the acoustic analysis
+AmpData <- Dataset %>% filter(Var2 == "amp")
+AmpData
+
+Amplitude <- AmpData %>% select(Freq)
+Amplitude<- Amplitude %>% rename(Amp = Freq)
+Amplitude
+
+#freq refers to the exact frequency at which the peak in the frequency bin was found
+FreqData <- Dataset %>% filter(Var2 == "freq")
+FreqData = cbind(FreqData, Amplitude)
+
+#creating the dataset with peak amplitude values found in every frequency bin  
+Peaks <- FreqData %>% select(File_Index, Filename, Time_Recorded, Date_Recorded, Freq, Amp)
+Peaks
+
+## Adding additional information about Site name (N = 20), treatment (restored, unrestored, LLD) and year (2020 or 2021)
+#example for site unrestored site 'Urdali Mal' 
+Peaks$Site_Name<-"Urdali_Mal"
+Peaks$Site_Type<-"Unrestored"
+Peaks$Year<-"2021"
+
+#The files from each sampling location are combined to create a single file of 'peaks' used in the code chunk below
+
+```
+
+#READ IN DATA
+```{r message=FALSE, include=FALSE, warning=FALSE}
+
+# Read in csv of peaks in the created in the chunk of code above  
+
+Peaks <- read.csv("Winter2020-2021-Peak-Freq-0-24kHz-30min-1000Hz.csv")
+
+```
+
+#COMPUTATION OF ACOUSTIC SPACE USED 
+This chunk of code is used to compute the outcome variable, acoustic space used. We use the file of frequency peaks created in the chunk of code above.
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+# Check range of Amp values to be reported in the methods section
+min(Peaks$Amp)
+max(Peaks$Amp)
+
+# Check distribution of Amp values to determine if the ASU distribution meets the requirements of the generalized linear mixed model and to determine what threshold
+hist(Peaks$Amp, xlab = "Non-normalized absolute amplitude",
+     col = "green",
+     breaks = 100000, xlim = c(0,20),
+     main = "Histogram of non-normalized amplitude")
+
+#Scale amplitude values between -1 and 1 following methods in Campos Cerquiera et al. 2020*
+Amp_scaled <- Peaks%>%dplyr::group_by(Filename) %>%dplyr::mutate(Amp = rescale(Amp, to = c(-1,1)))
+
+#selecting a scaled amplitude threshold of 0.003 following methods in Campos Cerquiera et al. 2020
+#at this threshold we can distinguisgh background noise from vocalizations
+Amp_scaled <- Amp_scaled %>% filter(Amp > 0.003)
+
+#Create Frequency bins vector with 128 bins with breaks (each bin is of 0.1875 Hz)
+Freq_bin_vector <- seq(0,24, by = 0.1875)
+Freq_bin_vector
+
+#Give them bin numbers
+labels <- seq(1,128)
+
+# bucketing frequency values into 256 bins
+Freq_bins_128 <- cut(Amp_scaled$Freq, 
+                     breaks=Freq_bin_vector, 
+                     include.lowest=TRUE, 
+                     right=FALSE, 
+                     labels=labels)
+Amp_scaled$Freq_bins_128 <- as.numeric(as.character(Freq_bins_128))
+
+#Create one hour time bins (used for GLMM analysis)
+#specify interval/bin labels for Time aggregation
+timebreaks <- c(00000,10000,20000,30000,
+                40000,50000,60000,70000,
+                80000,90000,100000,110000,
+                120000,130000,
+                140000,150000,160000,170000,
+                180000,190000,200000,210000,
+                220000,230000,240000)
+
+#label every time bin using the upper limit
+timetags <- c("1","2","3","4","5","6","7","8",
+              "9","10",
+              "11","12","13","14","15","16","17","18",
+              "19","20",
+              "21","22","23","24")
+
+#assign values to their respective time bins
+Time_bin <- cut(Amp_scaled$Time_Recorded, 
+                breaks=timebreaks, 
+                include.lowest=TRUE, 
+                right=FALSE, 
+                labels=timetags)
+Amp_scaled$Time_24<-Time_bin
+
+#create a Freq_bin_vector to be used to name the bins according to the exact frequencies they represent
+Freq_bin_vector <- seq(0.1875,24, by = 0.1875)
+
+#create separate dataframe for 128 bins 
+Freq_bin_df <- as.data.frame(labels)
+Freq_bin_df$Frequency <- Freq_bin_vector 
+colnames(Freq_bin_df)[1] <- "Freq_bins_128"
+
+#Merge Peaks and 128 freq bins dataframes to get the actual frequency break values
+test_df <- merge.data.frame(Amp_scaled, Freq_bin_df, by = 'Freq_bins_128', all = TRUE)
+
+#Insert a dummy variable to 'count' presence of files in each freq bin
+test_df$File_Count <- 1
+
+#Group files by sampling location (recorder location), Treatment, Time (24 hrs) and Freq bins (128) count no. of files in each Time x Freq bin
+File_count_per_site <- test_df %>% group_by(Year, 
+                                            Treatment, Site_Code, 
+                                            Date_Recorded,
+                                            Time_24, Freq_bins_128, Frequency) %>%summarise(File_Count = sum(File_Count))
+#The variable 'File_Count' represents the number of files with a peak > 0.003 Amp (scaled) in each Time X Freq bin
+
+#Calculating proportion of files 'used' in each frequency bin 
+#Create a dataframe that contains the total number of files (with or without a peak > 0.003) in each Time x Freq bin grouped by Year, Treatment, sampling location and Day
+Total_files <- Amp_scaled %>% group_by(Year, Treatment, Time_24, Site_Code, Date_Recorded) %>% mutate(Total_files = length(unique(Filename))) # The variable 'Total_files' contains the total number of files in each Time x Freq bin
+
+#check and remove duplicates (if any) 
+Total_files <- Total_files[!duplicated(Total_files),]
+
+#create a data frame with details of the number of files with peaks > 0.003 and the total number of files in each Time x Freq bin with the site details 
+Total_files_new <- merge(File_count_per_site, Total_files[c('Year', 'Treatment','Site_Code', 'Date_Recorded','Total_files','Time_24')], by = c('Treatment','Site_Code','Year', 'Time_24','Date_Recorded'), all = TRUE)
+
+trial <- select(Total_files, 16)
+
+#check and remove duplicates (if any) and NAs
+Total_files <- Total_files[!duplicated(Total_files),]
+Total_files <- Total_files %>% drop_na()
+
+#Collapsing freq bins between 2-8 kHz and then computing the proportion of files
+#First, filter data for the frequency range between 2 - 8 kHz
+Files_8k <- Total_files_new %>% filter(Frequency_128 > 10 & Frequency_128 < 44)
+
+#Collapse all the frequencies between 2-8 kHz to compute the total sum of files
+asu_low_avg = Files_8k %>% group_by(Site_Code, Treatment, Year ,Time_24, Date_Recorded) %>%summarise_at(.vars = vars(File_Count, Total_files),
+               .funs = c(sum = "sum"))
+
+#Compute the proportion of files with a peak > 0.003 and total number of files per Time x Freq bin
+asu_low_avg$Proportion_activity <- asu_low_avg$File_Count_sum/asu_low_avg$Total_files_sum
+
+Files_prop_8k <- asu_low_avg # Renaming dataframe
+
+#Changing proportion to percentage by multiplying it to 100
+Files_prop_8k$Percent_ASU <- Files_prop_8k$Proportion_activity*100 # Here, the variable 'Percent_ASU' shows the percentage of files with a peak > 0.003 amplitude (scaled) or ASU as percentage
+
+Files_prop_8k$Time_24 <- as.numeric(as.character(Files_prop_8k$Time_24)) #Check datatype for 'Time_24' 
+
+#*full citation of paper: Campos-Cerqueira M, Mena JL, Tejeda-Gómez V, Aguilar-Amuchastegui N, Gutierrez N, Aide TM (2020) How does FSC forest certification affect the acoustically active fauna in Madre de Dios, Peru? Remote Sensing in Ecology and Conservation 6:274–285
+
+```
+
+#SAVE CSV OF ACOUSTIC SPACE USE IN 2000-8000 Hz RANGE
+We save the csv of acoustic space use computed in the chunk of code above as we will be using this csv for the GLMMs, Wilcoxon tests and PERMANOVA.
+
+```{r include= FALSE, message=FALSE, warning=FALSE}
+
+write.csv(Files_prop_8k, "Winter2020-2021-ASU-Prop-2-8k")
+
+```
+
+#FIGURE 3: CURVE OF PROPORTION OF ACOUSTIC SPACE USED OVER 24 HOURS (RAW DATA)
+This chunk of code produces the line graph in Figure 3 depicting the acoustic space used over a 24 hour period (based on raw data).
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+#Averaging Percent ASU per Treatment for visualization
+Plotdata <- Files_prop_8k %>% 
+  group_by(Treatment, Time_24) %>%
+  summarise(Percent_ASU = mean(Percent_ASU))
+
+### Plotting Percent ASU collapsed over 2-8 kHz
+# Create the base plot
+#Plot prop over time 
+cbp <- c("#999999", "#E69F00", "#56B4E9")
+
+fig <- ggplot(Plotdata, aes(x = Time_24, y = Percent_ASU, color =  Treatment, fill = Treatment)) +
+  #geom_line(size =1)+
+  geom_smooth(stat = 'summary', fun.y = mean, se = TRUE) +
+  stat_summary(fun.y = mean, geom = "line", size = 1)+
+  scale_color_manual(name = "Site Type", values = cbp1,
+                     labels=c('Low Lantana density', 'Restored', 'Unrestored'))+
+  scale_fill_manual(name = "Site Type", values = cbp1, 
+                    labels=c('Low Lantana density', 'Restored', 'Unrestored'))+
+  theme_bw()+
+  theme(text = element_text(size=13))+
+  xlab("Time (24 hours)")+
+  ylab("Acoustic space occupancy (in percentage)")+
+  theme(legend.position = "bottom")+
+  scale_x_continuous(n.breaks = 13, limits = c(1,24))+
+  theme(text = element_text(size=14),
+        axis.text.x = element_text(angle=0, hjust=0.5))+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+fig
+
+```
+
+#WILCOXON TEST RESULTS
+This chunk of code creates the outcome variable ASU over 24 hours and the paired datasets used for the Wilcoxon tests, the results of which are presented in Tables S14 (A-C).
+
+```{r message=FALSE, warning=FALSE, include=TRUE}
+
+asu_low = Files_prop_8k # Renaming dataframe from above to use for Wilcoxon test below
+
+#Calculate the average ASU over a 24 hour period
+asu_low_avg= asu_low%>%dplyr::group_by(Site_Code, Treatment, Year, Time_24, Date_Recorded)%>%dplyr::summarise_at(.vars = vars(File_Count, Total_files),.funs=c(sum = "sum"))
+
+asu_low_avg = asu_low_avg%>%mutate(Prop_ASU = File_Count_sum/Total_files_sum)
+
+#Create the datasets of different pairs: restored - unrestored, restored- LLD, and unrestored- LLD
+to_remove <- asu_low_avg %>%filter(Treatment == "No_Lantana")
+asu_low_avg_res_unres <- anti_join(asu_low_avg, to_remove)
+
+to_remove <- asu_low_avg %>%filter(Treatment == "Unrestored")
+asu_low_avg_res_bench <- anti_join(asu_low_avg , to_remove)
+
+to_remove <- asu_low_avg %>%filter(Treatment == "Restored")
+asu_low_avg_unres_bench <- anti_join(asu_low_avg , to_remove)
+
+```
+
+#TABLE S14: WILCOXON TEST RESULTS FOR BOTH YEARS
+This chunk of code is used for the Wilcoxon tests, the results of which are present in Table S14.
+
+```{message=FALSE, warning= FALSE, include=TRUE}
+##Table S14 (A): Acoustic space use in 2000-8000 Hz range over 24 hours 
+
+##Restored - Unrestored
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_low_avg_res_unres, exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+res_unres_asu_low_avg <- asu_low_avg_res_unres%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_unres_asu_low_avg
+
+##Restored - LLD
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_low_avg_res_bench, exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values
+res_bench_asu_low_avg <- asu_low_avg_res_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_bench_asu_low_avg
+
+##Unrestored  - LLD 
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_low_avg_unres_bench, exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values
+unres_bench_asu_low_avg <- asu_low_avg_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+unres_bench_asu_low_avg
+
+##Table S14 (B): Acoustic space use in 2000-8000 Hz range in day-time hours (06:00- 18:00) 
+#filter daytime hours of ASU 
+asu_day = asu_low_avg%>%filter( Time_24> 5 & Time_24<18)
+
+##Create paired dataset for day time hours 
+to_remove <- asu_day%>%filter(Treatment == "No_Lantana")
+asu_day_avg_res_unres <- anti_join(asu_day, to_remove)
+
+to_remove <- asu_day %>%filter(Treatment == "Unrestored")
+asu_day_avg_res_bench <- anti_join(asu_day, to_remove)
+
+to_remove <- asu_day %>%filter(Treatment == "Restored")
+asu_day_avg_unres_bench <- anti_join(asu_day, to_remove)
+
+##Restored - Unrestored
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_day_avg_res_unres, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+res_unres_asu_low_avg <- asu_day_avg_res_unres%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_unres_asu_low_avg
+
+##Restored - LLD
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_day_avg_res_bench, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+res_bench_asu_low_avg <- asu_day_avg_res_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_bench_asu_low_avg
+
+##Unrestored - LLD
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_day_avg_unres_bench, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+unres_bench_asu_low_avg <- asu_day_avg_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+unres_bench_asu_low_avg
+
+##Table S14 (C): Acoustic space use in 2000-8000 Hz range in night-time hours (18:00 - 06:00)
+#filter night time hours of ASU
+asu_night_18 = asu_low_avg%>%filter(Time_24 > 17)
+asu_night_6 = asu_low_avg%>%filter(Time_24 <6)
+asu_night = full_join(asu_night_18, asu_night_6)
+
+#Create paired datasets 
+to_remove <- asu_night%>%filter(Treatment == "No_Lantana")
+asu_night_avg_res_unres <- anti_join(asu_night, to_remove)
+
+to_remove <- asu_night %>%filter(Treatment == "Unrestored")
+asu_night_avg_res_bench <- anti_join(asu_night, to_remove)
+
+to_remove <- asu_night %>%filter(Treatment == "Restored")
+asu_night_avg_unres_bench <- anti_join(asu_night, to_remove)
+
+##Restored - Unrestored
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_night_avg_res_unres, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+res_unres_asu_low_avg <- asu_night_avg_res_unres%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_unres_asu_low_avg
+
+##Restored - LLD
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment.x, data = asu_night_avg_res_bench, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+res_bench_asu_low_avg <- asu_night_avg_res_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+res_bench_asu_low_avg
+
+##Unrestored - LLD
+wilcox_both_years <- wilcox.test(Prop_ASU ~ Treatment, data = asu_night_avg_unres_bench, 
+                                 exact = FALSE, conf.int = TRUE)
+wilcox_both_years
+
+#Calculate the standardised z statistic Z and call it Zstat
+Zstat<-qnorm(wilcox_both_years$p.value/2)
+Zstat
+
+#For the median values 
+unres_bench_asu_low_avg <- asu_night_avg_unres_bench%>%
+  group_by(Treatment)%>%summarise(median_prop_ASU = median(Prop_ASU), lower_quantile = quantile(Prop_ASU, 0.25),upper_quantile = quantile(Prop_ASU, 0.75))
+unres_bench_asu_low_avg
+
+```
+
+
+#END
